@@ -39,6 +39,7 @@ pub(crate) struct StratumError(pub(crate) ErrorCode, pub(crate) String, #[serde(
 pub(crate) enum MiningNotify {
     MiningNotifyShort((String, [u64; 4], u64)),
     MiningNotifyLong((String, String, String, String, Vec<String>, String, String, String, bool)),
+    MiningNotifyAleo((u64, u64, String, String, bool)),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -51,8 +52,15 @@ pub enum MiningSubmit {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum MiningSubscribe {
-    MiningSubscribeDefault((String,)),
-    MiningSubscribeOptions((String, String)),
+    MiningSubscribeDefault((String, String)),
+    MiningSubscribeOptions((String, String, String)),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum MiningAuthorize {
+    MiningAuthorizeDefault((String, String)),
+    MiningAuthorizeOptions((String, String, String)),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -74,7 +82,7 @@ pub(crate) enum StratumCommand {
     #[serde(rename = "mining.subscribe")]
     Subscribe(MiningSubscribe),
     #[serde(rename = "mining.authorize")]
-    Authorize((String, String)),
+    Authorize(MiningAuthorize),
     #[serde(rename = "mining.submit")]
     MiningSubmit(MiningSubmit),
     /*#[serde(rename = "mining.submit_hashrate")]

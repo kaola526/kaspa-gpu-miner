@@ -12,7 +12,7 @@ mod statum_codec;
 
 use crate::client::stratum::statum_codec::{ErrorCode, MiningNotify, MiningSubmit, NewLineJsonCodecError, StratumLine};
 use crate::client::stratum::statum_codec::{
-    MiningSubscribe, SetExtranonce, StratumCommand, StratumError, StratumLinePayload, StratumResult,
+    MiningAuthorize, MiningSubscribe, SetExtranonce, StratumCommand, StratumError, StratumLinePayload, StratumResult,
 };
 use crate::client::Client;
 use crate::pow::BlockSeed;
@@ -115,6 +115,7 @@ impl Client for StratumHandler {
                 id,
                 payload: StratumLinePayload::StratumCommand(StratumCommand::Subscribe(
                     MiningSubscribe::MiningSubscribeDefault((
+                        format!("spool"),
                         format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
                         //self.extranonce.clone().unwrap_or("0xffffffff".into())
                     )),
@@ -139,10 +140,9 @@ impl Client for StratumHandler {
         self.send_channel
             .send(StratumLine {
                 id,
-                payload: StratumLinePayload::StratumCommand(StratumCommand::Authorize((
-                    pay_address.clone(),
-                    "x".into(),
-                ))),
+                payload: StratumLinePayload::StratumCommand(StratumCommand::Authorize(
+                    MiningAuthorize::MiningAuthorizeDefault((format!("username"), pay_address.clone())),
+                )),
                 jsonrpc: None,
                 error: None,
             })
@@ -153,6 +153,7 @@ impl Client for StratumHandler {
     async fn listen(&mut self, miner: &mut MinerManager) -> Result<(), Error> {
         info!("Waiting for stuff");
         loop {
+            // solo模式下抽水模式
             {
                 if (!self.mining_dev.unwrap_or(true)
                     && self.block_template_ctr.load(Ordering::SeqCst) <= self.devfund_percent)
@@ -214,7 +215,7 @@ impl StratumHandler {
                 .unwrap_or_else(|| Arc::new(AtomicU16::new((thread_rng().next_u64() % 10_000u64) as u16))),
             target_pool: Default::default(),
             target_real: Default::default(),
-            nonce_mask: 0,
+            nonce_mask: 0xffffffffffffffffu64,
             nonce_fixed: 0,
             extranonce: None,
             last_stratum_id,
@@ -379,6 +380,8 @@ impl StratumHandler {
         let new_exponent = (DIFFICULTY_1_TARGET.1 + exponent) as u64;
         let start = (new_exponent / 64) as usize;
         let remainder = new_exponent % 64;
+
+        info!("set_difficulty {mantissa} {exponent} {new_mantissa} {new_exponent} {start} {remainder}");
 
         buf[start] = new_mantissa << remainder; // bottom
         if start < 3 {
