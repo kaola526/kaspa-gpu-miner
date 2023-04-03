@@ -293,13 +293,6 @@ impl StratumHandler {
                             }
                             StratumResult::Subscribe((ref _subscriptions, ref extranonce, ref nonce_size)) => {
                                 self.set_extranonce(extranonce.as_str(), nonce_size)
-                                /*for (name, value) in _subscriptions {
-                                    match name.as_str() {
-                                        "mining.set_difficulty" => {self.set_difficulty(&f32::from_str(value.as_str())?)?;},
-                                        _ => {warn!("Ignored {} (={})", name, value);}
-                                    }
-                                }
-                                Ok(())*/
                             }
                             _ => Err(format!("Inconsistent stratum message: {:?}", msg).into()),
                         }

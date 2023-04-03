@@ -284,36 +284,6 @@ impl MinerManager {
                         }
                     }
 
-                        /*
-                        info!("Output should be: {:02X?}", state_ref.calculate_pow(nonces[0]).to_le_bytes());
-                        info!("We got: {:02X?} (Nonces: {:02X?})", hashes[0], nonces[0].to_le_bytes());
-                        assert!(state_ref.calculate_pow(nonces[0]).to_le_bytes() == hashes[0]);
-                        */
-                        /*
-                        info!("Output should be: {}", state_ref.calculate_pow(nonces[nonces.len()-1]).0[3]);
-                        info!("We got: {} (Nonces: {})", Uint256::from_le_bytes(hashes[nonces.len()-1]).0[3], nonces[nonces.len()-1]);
-                        assert!(state_ref.calculate_pow(nonces[nonces.len()-1]).0[0] == Uint256::from_le_bytes(hashes[nonces.len()-1]).0[0]);
-                         */
-                        /*
-                        if state_ref.calculate_pow(nonces[0]).0[0] != Uint256::from_le_bytes(hashes[0]).0[0] {
-                            gpu_work.sync()?;
-                            let mut nonce_vec = vec![nonces[0]; 1];
-                            nonce_vec.append(&mut vec![0u64; gpu_work.workload-1]);
-                            gpu_work.calculate_pow_hash(&state_ref.pow_hash_header, Some(&nonce_vec));
-                            gpu_work.sync()?;
-                            gpu_work.calculate_matrix_mul(&mut state_ref.matrix.clone().0.as_slice().as_dbuf().unwrap());
-                            gpu_work.sync()?;
-                            gpu_work.calculate_heavy_hash();
-                            gpu_work.sync()?;
-                            let mut hashes2  = vec![[0u8; 32]; out_size];
-                            let mut nonces2= vec![0u64; out_size];
-                            gpu_work.copy_output_to(&mut hashes2, &mut nonces2);
-                            assert!(state_ref.calculate_pow(nonces[0]).to_le_bytes() == hashes2[0]);
-                            assert!(nonces2[0] == nonces[0]);
-                            assert!(hashes2 == hashes);
-                            assert!(false);
-                        }*/
-
                     hashes_tried.fetch_add(gpu_work.get_workload().try_into().unwrap(), Ordering::AcqRel);
                     worker_hashes_tried.fetch_add(gpu_work.get_workload().try_into().unwrap(), Ordering::AcqRel);
 

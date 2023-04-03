@@ -161,12 +161,12 @@ impl<'gpu> CudaGPUWorker<'gpu> {
         let _module: Arc<Module>;
         info!("Device #{} compute version is {}.{}", device_id, major, minor);
         if major > 8 || (major == 8 && minor >= 6) {
-            _module = Arc::new(Module::from_ptx(PTX_86, &[ModuleJitOption::OptLevel(OptLevel::O4)]).map_err(|e| {
+            _module = Arc::new(Module::from_ptx(PTX_61, &[ModuleJitOption::OptLevel(OptLevel::O4)]).map_err(|e| {
                 error!("Error loading PTX. Make sure you have the updated driver for you devices");
                 e
             })?);
         } else if major > 7 || (major == 7 && minor >= 5) {
-            _module = Arc::new(Module::from_ptx(PTX_75, &[ModuleJitOption::OptLevel(OptLevel::O4)]).map_err(|e| {
+            _module = Arc::new(Module::from_ptx(PTX_61, &[ModuleJitOption::OptLevel(OptLevel::O4)]).map_err(|e| {
                 error!("Error loading PTX. Make sure you have the updated driver for you devices");
                 e
             })?);
