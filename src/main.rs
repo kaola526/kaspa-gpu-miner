@@ -73,6 +73,7 @@ async fn get_client(
     mining_address: String,
     mine_when_not_synced: bool,
     block_template_ctr: Arc<AtomicU16>,
+    device_name: Option<String>,
 ) -> Result<Box<dyn Client + 'static>, Error> {
     if kaspad_address.starts_with("stratum+tcp://") {
         let (_schema, address) = kaspad_address.split_once("://").unwrap();
@@ -81,6 +82,7 @@ async fn get_client(
             mining_address.clone(),
             mine_when_not_synced,
             Some(block_template_ctr.clone()),
+            device_name,
         )
         .await?)
     } else if kaspad_address.starts_with("grpc://") {
@@ -106,6 +108,7 @@ async fn client_main(
         opt.mining_address.clone(),
         opt.mine_when_not_synced,
         block_template_ctr.clone(),
+        opt.device_name.clone(),
     )
     .await?;
 

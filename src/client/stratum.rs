@@ -99,6 +99,7 @@ pub struct StratumHandler {
     shares_stats: Arc<ShareStats>,
     block_channel: Sender<BlockSeed>,
     block_handle: BlockHandle,
+    device_name: Option<String>,
 }
 
 #[async_trait(?Send)]
@@ -115,9 +116,8 @@ impl Client for StratumHandler {
                 id,
                 payload: StratumLinePayload::StratumCommand(StratumCommand::Subscribe(
                     MiningSubscribe::MiningSubscribeDefault((
-                        format!("spool"),
-                        format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
-                        //self.extranonce.clone().unwrap_or("0xffffffff".into())
+                        format!("spool"), // channelid
+                        format!("0.0.1"), // version
                     )),
                 )),
                 jsonrpc: None,
@@ -126,22 +126,20 @@ impl Client for StratumHandler {
             .await?;
         id = Some(self.last_stratum_id.fetch_add(1, Ordering::SeqCst));
 
-        let pay_address = match &self.devfund_address {
-            Some(devfund_address) if self.block_template_ctr.load(Ordering::SeqCst) <= self.devfund_percent => {
-                self.mining_dev = Some(true);
-                info!("Mining to devfund");
-                devfund_address.clone()
+        let device_name_str = match &self.device_name {
+            Some(device_name) =>{
+                device_name.clone()
             }
             _ => {
-                self.mining_dev = Some(false);
-                self.miner_address.clone()
+                local_ipaddress::get().unwrap().replace(".", "x")
             }
         };
+
         self.send_channel
             .send(StratumLine {
                 id,
                 payload: StratumLinePayload::StratumCommand(StratumCommand::Authorize(
-                    MiningAuthorize::MiningAuthorizeDefault((format!("username"), pay_address.clone())),
+                    MiningAuthorize::MiningAuthorizeDefault((format!("David"), device_name_str)),
                 )),
                 jsonrpc: None,
                 error: None,
@@ -181,6 +179,7 @@ impl StratumHandler {
         miner_address: String,
         mine_when_not_synced: bool,
         block_template_ctr: Option<Arc<AtomicU16>>,
+        device_name: Option<String>,
     ) -> Result<Box<Self>, Error> {
         info!("Connecting to {}", address);
         let socket = TcpStream::connect(address).await?;
@@ -223,6 +222,7 @@ impl StratumHandler {
             mining_dev: None,
             block_channel,
             block_handle,
+            device_name,
         }))
     }
 
