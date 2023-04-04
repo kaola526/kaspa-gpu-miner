@@ -54,6 +54,7 @@ pub enum MiningSubmit {
 pub enum MiningSubscribe {
     MiningSubscribeDefault((String, String)),
     MiningSubscribeOptions((String, String, String)),
+    MiningSubscribeV1((String, String, String, String)),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

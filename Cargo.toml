@@ -50,6 +50,7 @@ nix = "0.25"
 hex = "0.4"
 semver = "1.0"
 time = { version = "0.3", features = ["formatting", "macros"] }
+libc = "0.2"
 
 [dependencies.local_ipaddress]
 version = "0.1.3"

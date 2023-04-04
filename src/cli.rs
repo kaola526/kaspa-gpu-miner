@@ -13,6 +13,9 @@ pub struct Opt {
     #[clap(short = 's', long = "kaspad-address", default_value = "127.0.0.1", help = "The IP of the kaspad instance")]
     pub kaspad_address: String,
 
+    #[clap(short = 'm', long = "miner-name", help = "miner name")]
+    pub miner_name: Option<String>,
+
     #[clap(short = 'n', long = "device-name", help = "device name")]
     pub device_name: Option<String>,
 

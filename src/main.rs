@@ -73,6 +73,7 @@ async fn get_client(
     mining_address: String,
     mine_when_not_synced: bool,
     block_template_ctr: Arc<AtomicU16>,
+    miner_name: Option<String>,
     device_name: Option<String>,
 ) -> Result<Box<dyn Client + 'static>, Error> {
     if kaspad_address.starts_with("stratum+tcp://") {
@@ -82,6 +83,7 @@ async fn get_client(
             mining_address.clone(),
             mine_when_not_synced,
             Some(block_template_ctr.clone()),
+            miner_name,
             device_name,
         )
         .await?)
@@ -108,6 +110,7 @@ async fn client_main(
         opt.mining_address.clone(),
         opt.mine_when_not_synced,
         block_template_ctr.clone(),
+        opt.miner_name.clone(),
         opt.device_name.clone(),
     )
     .await?;

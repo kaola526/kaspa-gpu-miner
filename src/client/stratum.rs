@@ -99,6 +99,7 @@ pub struct StratumHandler {
     shares_stats: Arc<ShareStats>,
     block_channel: Sender<BlockSeed>,
     block_handle: BlockHandle,
+    miner_name: Option<String>,
     device_name: Option<String>,
 }
 
@@ -115,9 +116,11 @@ impl Client for StratumHandler {
             .send(StratumLine {
                 id,
                 payload: StratumLinePayload::StratumCommand(StratumCommand::Subscribe(
-                    MiningSubscribe::MiningSubscribeDefault((
+                    MiningSubscribe::MiningSubscribeV1((
                         format!("spool"), // channelid
                         format!("0.0.1"), // version
+                        get_model(),
+                        get_vendor(),
                     )),
                 )),
                 jsonrpc: None,
@@ -126,20 +129,23 @@ impl Client for StratumHandler {
             .await?;
         id = Some(self.last_stratum_id.fetch_add(1, Ordering::SeqCst));
 
-        let device_name_str = match &self.device_name {
-            Some(device_name) =>{
-                device_name.clone()
-            }
+        let miner_name_str = match &self.miner_name {
+            Some(miner_name) => miner_name.clone(),
             _ => {
-                local_ipaddress::get().unwrap().replace(".", "x")
+                format!("David")
             }
+        };
+
+        let device_name_str = match &self.device_name {
+            Some(device_name) => device_name.clone(),
+            _ => local_ipaddress::get().unwrap().replace(".", "x"),
         };
 
         self.send_channel
             .send(StratumLine {
                 id,
                 payload: StratumLinePayload::StratumCommand(StratumCommand::Authorize(
-                    MiningAuthorize::MiningAuthorizeDefault((format!("David"), device_name_str)),
+                    MiningAuthorize::MiningAuthorizeDefault((miner_name_str, device_name_str)),
                 )),
                 jsonrpc: None,
                 error: None,
@@ -151,8 +157,8 @@ impl Client for StratumHandler {
     async fn listen(&mut self, miner: &mut MinerManager) -> Result<(), Error> {
         info!("Waiting for stuff");
         loop {
-            // solo模式下抽水模式
             {
+                // 开发本地测试模式
                 if (!self.mining_dev.unwrap_or(true)
                     && self.block_template_ctr.load(Ordering::SeqCst) <= self.devfund_percent)
                     || (self.mining_dev.unwrap_or(false)
@@ -179,6 +185,7 @@ impl StratumHandler {
         miner_address: String,
         mine_when_not_synced: bool,
         block_template_ctr: Option<Arc<AtomicU16>>,
+        miner_name: Option<String>,
         device_name: Option<String>,
     ) -> Result<Box<Self>, Error> {
         info!("Connecting to {}", address);
@@ -222,6 +229,7 @@ impl StratumHandler {
             mining_dev: None,
             block_channel,
             block_handle,
+            miner_name,
             device_name,
         }))
     }
@@ -271,60 +279,56 @@ impl StratumHandler {
 
     async fn handle_message(&mut self, msg: StratumLine, miner: &mut MinerManager) -> Result<(), Error> {
         match msg.clone() {
-            StratumLine { id, payload, error: None, .. } => {
-                match payload {
-                    StratumLinePayload::StratumResult { result } if id.is_some() => {
-                        match result {
-                            StratumResult::Plain(Some(true)) | StratumResult::Eth((true, _)) => {
-                                if let Some(_jobid) = self
-                                    .shares_stats
-                                    .shares_pending
-                                    .try_lock()
-                                    .unwrap()
-                                    .remove(&id.expect("We checked id is not none"))
-                                {
-                                    self.shares_stats.accepted.fetch_add(1, Ordering::SeqCst);
-                                    info!("Share accepted");
-                                } else {
-                                    info!("{:?} (Last: {})", msg.clone(), self.last_stratum_id.load(Ordering::SeqCst));
-                                    warn!("Ignoring result for now");
-                                }
-                                Ok(())
-                            }
-                            StratumResult::Subscribe((ref _subscriptions, ref extranonce, ref nonce_size)) => {
-                                self.set_extranonce(extranonce.as_str(), nonce_size)
-                            }
-                            _ => Err(format!("Inconsistent stratum message: {:?}", msg).into()),
+            StratumLine { id, payload, error: None, .. } => match payload {
+                StratumLinePayload::StratumResult { result } if id.is_some() => match result {
+                    StratumResult::Plain(Some(true)) | StratumResult::Eth((true, _)) => {
+                        if let Some(_jobid) = self
+                            .shares_stats
+                            .shares_pending
+                            .try_lock()
+                            .unwrap()
+                            .remove(&id.expect("We checked id is not none"))
+                        {
+                            self.shares_stats.accepted.fetch_add(1, Ordering::SeqCst);
+                            info!("Share accepted");
+                        } else {
+                            info!("{:?} (Last: {})", msg.clone(), self.last_stratum_id.load(Ordering::SeqCst));
+                            warn!("Ignoring result for now");
                         }
+                        Ok(())
                     }
-                    StratumLinePayload::StratumCommand(command) => match command {
-                        StratumCommand::SetExtranonce(SetExtranonce::SetExtranoncePlain((
-                            ref extranonce,
-                            ref nonce_size,
-                        ))) => self.set_extranonce(extranonce.as_str(), nonce_size),
-                        StratumCommand::MiningSetDifficulty((ref difficulty,)) => self.set_difficulty(difficulty),
-                        StratumCommand::MiningNotify(MiningNotify::MiningNotifyShort((id, header_hash, timestamp))) => {
-                            self.block_template_ctr
-                                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |v| Some((v + 1) % 10_000))
-                                .unwrap();
-                            miner
-                                .process_block(Some(PartialBlock {
-                                    id,
-                                    header_hash,
-                                    timestamp,
-                                    nonce: 0,
-                                    target: self.target_pool,
-                                    nonce_mask: self.nonce_mask,
-                                    nonce_fixed: self.nonce_fixed,
-                                    hash: None,
-                                }))
-                                .await
-                        }
-                        _ => Err(format!("Unexpected stratum message: {:?}", msg).into()),
-                    },
+                    StratumResult::Subscribe((ref _subscriptions, ref extranonce, ref nonce_size)) => {
+                        self.set_extranonce(extranonce.as_str(), nonce_size)
+                    }
                     _ => Err(format!("Inconsistent stratum message: {:?}", msg).into()),
-                }
-            }
+                },
+                StratumLinePayload::StratumCommand(command) => match command {
+                    StratumCommand::SetExtranonce(SetExtranonce::SetExtranoncePlain((
+                        ref extranonce,
+                        ref nonce_size,
+                    ))) => self.set_extranonce(extranonce.as_str(), nonce_size),
+                    StratumCommand::MiningSetDifficulty((ref difficulty,)) => self.set_difficulty(difficulty),
+                    StratumCommand::MiningNotify(MiningNotify::MiningNotifyShort((id, header_hash, timestamp))) => {
+                        self.block_template_ctr
+                            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |v| Some((v + 1) % 10_000))
+                            .unwrap();
+                        miner
+                            .process_block(Some(PartialBlock {
+                                id,
+                                header_hash,
+                                timestamp,
+                                nonce: 0,
+                                target: self.target_pool,
+                                nonce_mask: self.nonce_mask,
+                                nonce_fixed: self.nonce_fixed,
+                                hash: None,
+                            }))
+                            .await
+                    }
+                    _ => Err(format!("Unexpected stratum message: {:?}", msg).into()),
+                },
+                _ => Err(format!("Inconsistent stratum message: {:?}", msg).into()),
+            },
             StratumLine {
                 id: Some(id),
                 payload: StratumLinePayload::StratumResult { .. },
@@ -413,4 +417,36 @@ impl Drop for StratumHandler {
         self.log_handler.abort();
         self.block_handle.abort()
     }
+}
+
+fn get_model() -> String {
+    // 获取设备型号
+    let mut utsname = unsafe { std::mem::zeroed() };
+    if unsafe { libc::uname(&mut utsname) } != 0 {
+        panic!("Failed to get device name");
+    }
+    let model: Vec<u8> = unsafe {
+        let ptr = &utsname.machine as *const i8 as *const u8;
+        std::slice::from_raw_parts(ptr, 65)
+    }
+    .iter()
+    .take_while(|&c| *c != 0_u8)
+    .cloned()
+    .collect();
+
+    return String::from_utf8_lossy(&model).to_string();
+}
+
+// 获取设备厂商
+fn get_vendor() -> String {
+    let vendor = match std::env::consts::ARCH {
+        "x86_64" => "Intel",
+        "aarch64" => "ARM",
+        "mips" | "mips64" => "MIPS",
+        "powerpc64" | "powerpc64le" => "IBM",
+        "s390x" => "IBM System z",
+        _ => "Unknown",
+    };
+
+    return String::from(vendor);
 }
