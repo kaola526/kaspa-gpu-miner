@@ -117,7 +117,7 @@ impl Client for StratumHandler {
                 id,
                 payload: StratumLinePayload::StratumCommand(StratumCommand::Subscribe(
                     MiningSubscribe::MiningSubscribeV1((
-                        format!("spool"), // channelid
+                        format!("kaspa"), // channelid
                         format!("0.0.1"), // version
                         get_model(),
                         get_vendor(),
@@ -394,7 +394,7 @@ impl StratumHandler {
 
     fn set_extranonce(&mut self, extranonce: &str, nonce_size: &u32) -> Result<(), Error> {
         self.extranonce = Some(extranonce.to_string());
-        info!("Extra! {:?}", extranonce);
+        info!("Extra! {:?} {nonce_size}", extranonce);
         self.nonce_fixed = u64::from_str_radix(extranonce, 16)? << (nonce_size * 8);
         info!("Extra Done!");
         self.nonce_mask = (1 << (nonce_size * 8)) - 1;
